@@ -93,7 +93,7 @@ function startSecureSession($redirectToLogin = true, $initSecureData = false) {
 	// init secure data if needed
 	if ($initSecureData && !isset($_SESSION["sec_session_id"])) {
 		$_SESSION["sec_session_id"] = session_id();
-		$_SESSION["sec_client_ip"] = $_SERVER['REMOTE_ADDR'];
+		$_SESSION["sec_client_ip"] = getClientIP()[0];
 		$_SESSION['sec_sessionTime'] = time();
 		$_SESSION['cfgMain'] = new LAMCfgMain();
 	}
@@ -117,7 +117,7 @@ function startSecureSession($redirectToLogin = true, $initSecureData = false) {
 		}
 	}
 	// check if client IP has not changed
-	if (!isset($_SESSION["sec_client_ip"]) || ($_SESSION["sec_client_ip"] != $_SERVER['REMOTE_ADDR'])) {
+	if (!isset($_SESSION["sec_client_ip"]) || ($_SESSION["sec_client_ip"] != getClientIP()[0])) {
 		// IP is invalid
 		logNewMessage(LOG_WARNING, "Client IP changed, access denied (" . getClientIPForLogging() . ")");
 		if ($redirectToLogin) {
@@ -167,7 +167,7 @@ function checkClientIP(): void {
 		$allowedHosts = $cfg->allowedHostsSelfService;
 	}
 	// skip test if no hosts are defined
-	if (empty($allowedHosts) || empty($_SERVER['REMOTE_ADDR'])) {
+	if (empty($allowedHosts) || empty(getClientIP()[0])) {
 		return;
 	}
 	$allowedHosts = explode(",", $allowedHosts);
@@ -180,7 +180,7 @@ function checkClientIP(): void {
 		}
 		$hostRegex = str_replace(".", "\\.", $host);
 		$hostRegex = '/^' . str_replace("*", ".*", $hostRegex) . '$/';
-		$clientIP = $_SERVER['REMOTE_ADDR'];
+		$clientIP = getClientIP()[0];
 		if (preg_match($hostRegex, $clientIP)) {
 			// client is allowed to access LAM
 			$grantAccess = true;
@@ -897,19 +897,38 @@ function isLoggedIn() {
 }
 
 /**
+ * Returns an array with client IP as first element and proxy IPs if any (HTTP_X_FORWARDED_FOR, HTTP_X_REAL_IP).
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
+ *
+ * @return array client IP and proxy IPs. Contains always at least one element.
+ */
+function getClientIP(): array {
+	$ipList = [];
+	if ( ! empty($_SERVER['HTTP_X_REAL_IP'])) {
+		$ipList[] = $_SERVER['HTTP_X_REAL_IP'];
+	}
+	if ( ! empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+		$ipList += array_map(trim(...), explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']));
+	}
+	if (!empty($_SERVER['REMOTE_ADDR'])) {
+		$ipList[] = $_SERVER['REMOTE_ADDR'];
+	}
+	$ipList = array_unique($ipList);
+	if (empty($ipList)) {
+		return [''];
+	}
+
+	return $ipList;
+}
+
+/**
  * Returns the client IP and comma separated proxy IPs if any (HTTP_X_FORWARDED_FOR, HTTP_X_REAL_IP).
  *
  * @return String client IP (e.g. 10.10.10.10,11.11.11.11)
  */
-function getClientIPForLogging() {
-	$ip = empty($_SERVER['REMOTE_ADDR']) ? '' : $_SERVER['REMOTE_ADDR'];
-	if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && (strlen($_SERVER['HTTP_X_FORWARDED_FOR']) < 100)) {
-		$ip .= ',' . $_SERVER['HTTP_X_FORWARDED_FOR'];
-	}
-	if (!empty($_SERVER['HTTP_X_REAL_IP']) && (strlen($_SERVER['HTTP_X_REAL_IP']) < 100)) {
-		$ip .= ',' . $_SERVER['HTTP_X_REAL_IP'];
-	}
-	return $ip;
+function getClientIPForLogging(): string {
+	return implode(',', getClientIP());
 }
 
 /**
