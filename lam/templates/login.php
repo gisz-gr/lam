@@ -63,6 +63,10 @@ include_once __DIR__ . '/../lib/checkEnvironment.inc';
 
 /** security functions */
 include_once(__DIR__ . "/../lib/security.inc");
+
+/** GISZ security overrides */
+require_once __DIR__ . '/../lib/gisz_security.inc';
+
 /** self-service functions */
 include_once(__DIR__ . "/../lib/selfService.inc");
 /** access to configuration options */
@@ -486,7 +490,7 @@ if (isset($_POST['checklogin'])) {
 
 	$_SESSION['ldap'] = new Ldap($_SESSION['config']); // Create new Ldap object
 
-	$clientSource = $_SERVER['REMOTE_ADDR'];
+	$clientSource = GISZ\getRemoteAddr();
 	if (isset($_SERVER['REMOTE_HOST'])) {
 		$clientSource .= '/' . $_SERVER['REMOTE_HOST'];
 	}
@@ -610,7 +614,7 @@ if (isset($_POST['checklogin'])) {
 		$_SESSION['loggedIn'] = true;
 		// set security settings for session
 		$_SESSION['sec_session_id'] = session_id();
-		$_SESSION['sec_client_ip'] = $_SERVER['REMOTE_ADDR'];
+		$_SESSION['sec_client_ip'] = GISZ\getRemoteAddr();
 		$_SESSION['sec_sessionTime'] = time();
 		addSecurityTokenToSession();
 		// logging
